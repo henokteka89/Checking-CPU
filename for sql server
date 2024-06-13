@@ -1,0 +1,28 @@
+SELECT TOP 10 
+  req.session_id, 
+  req.status, 
+  req.start_time, 
+  ROUND(req.cpu_time, 3) AS 'cpu_time_ms', 
+  '0x'+ CONVERT(VARCHAR(16), CONVERT(VARBINARY(8), req.query_hash), 2) AS query_hash, 
+  req.logical_reads, 
+  req.dop,s.login_name, 
+  s.host_name, 
+  s.program_name, 
+  OBJECT_NAME(st.objectid, st.dbid) AS 'object_name', 
+  REPLACE( 
+    REPLACE( 
+      SUBSTRING( 
+        st.text, 
+        (req.statement_start_offset / 2) + 1, 
+        (CASE req.statement_end_offset 
+           WHEN -1 THEN DATALENGTH(st.text) 
+           ELSE req.statement_end_offset 
+         END - req.statement_start_offset) / 2 + 1), 
+      CHAR(10), ' '), 
+    CHAR(13), ' ') AS statement_text 
+FROM sys.dm_exec_requests AS req 
+INNER JOIN sys.dm_exec_sessions AS s 
+  ON req.session_id = s.session_id 
+CROSS APPLY sys.dm_exec_sql_text(req.sql_handle) AS st 
+WHERE req.session_id <> @@SPID 
+ORDER BY req.cpu_time DESC;
